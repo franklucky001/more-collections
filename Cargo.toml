@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "singly-linked-list",
+    "linked-stack",
+    "linked-queue",
+    "test-collections"
+]
