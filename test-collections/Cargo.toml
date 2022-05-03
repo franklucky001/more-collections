@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 linked_stack = {path = "../linked-stack"}
 linked_queue = {path = "../linked-queue"}
+singly_linked_list = {path = "../singly-linked-list"}

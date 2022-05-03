@@ -29,6 +29,15 @@ pub mod single_list {
         }
     }
 
+    impl<T> Default for List<T> {
+        fn default() -> Self {
+            Self{
+                head: None,
+                tail: None,
+                len: 0
+            }
+        }
+    }
     impl<T> List<T> {
         pub fn new() -> Self {
             Self {
@@ -164,6 +173,45 @@ pub mod single_list {
             }
             self.len += mem::replace(&mut other.len, 0);
         }
+        pub fn split_off(&mut self, at: usize) -> Self{
+            let len = self.len();
+            assert!(at <= len, "Cannot split off at a nonexistent index");
+            if at == 0 {
+                return mem::take(self);
+            } else if at == len {
+                return Self::new();
+            }else{
+                let mut prev = self.head.as_ref();
+                let mut step = at.checked_sub(1).unwrap_or(0);
+                while let Some(prev_node) = prev{
+                    if step == 0 {
+                        break
+                    }
+                    unsafe {
+                        prev = Option::from(&(*prev_node.deref().as_ptr()).next);
+                    }
+                    step -= 1;
+                }
+                let second_head: Link<T> = if let Some(prev_node) = prev{
+                    unsafe {
+                        (*prev_node.deref().as_ptr()).next.take()
+                    }
+                }else {
+                    None
+                };
+                let second_tail = self.tail.take();
+                let second = Self{
+                    head: second_head,
+                    tail: second_tail,
+                    len: self.len - at
+                };
+                self.tail = prev.map(|prev_node|{
+                    Rc::<RefCell<Node<T>>>::downgrade(prev_node)
+                });
+                self.len = at;
+                second
+            }
+        }
         pub fn iter(&self) -> Iter<'_, T> {
             Iter {
                 head: self
@@ -233,6 +281,12 @@ pub mod single_list {
         head: Option<&'a Node<T>>,
         len: usize,
     }
+
+    impl <T> Iter<'_, T> {
+        pub fn is_empty(&self) -> bool{
+            self.len == 0
+        }
+    }
     impl<'a, T> Iterator for Iter<'a, T> {
         type Item = &'a T;
         fn next(&mut self) -> Option<Self::Item> {
@@ -258,6 +312,11 @@ pub mod single_list {
         len: usize,
     }
 
+    impl <T> IterMut<'_, T> {
+        pub fn is_empty(&self) -> bool{
+            self.len == 0
+        }
+    }
     impl<'a, T> Iterator for IterMut<'a, T> {
         type Item = &'a mut T;
         fn next(&mut self) -> Option<Self::Item> {
@@ -326,8 +385,17 @@ pub mod single_list {
             self.iter().cloned().collect()
         }
 
-        fn clone_from(&mut self, source: &Self) {
-            todo!()
+        fn clone_from(&mut self, other: &Self) {
+            let mut iter_other = other.iter();
+            if self.len() > other.len() {
+                self.split_off(other.len());
+            }
+            for (elem, elem_other) in self.iter_mut().zip(&mut iter_other) {
+                elem.clone_from(elem_other);
+            }
+            if !iter_other.is_empty() {
+                self.extend(iter_other.cloned());
+            }
         }
     }
 }
@@ -443,6 +511,18 @@ mod tests {
         for n in 1..4 {
             let num = n * 10;
             assert_eq!(iter.next(), Some(&num));
+        }
+    }
+    #[test]
+    fn check_split_off(){
+        let mut list = List::new();
+        for i in 0..10{
+            list.push_back(i);
+        }
+        let second = list.split_off(5);
+        let second_vec = vec![5, 6, 7, 8, 9];
+        for (it, val) in second.iter().zip(second_vec){
+            assert_eq!(it, &val);
         }
     }
 }
